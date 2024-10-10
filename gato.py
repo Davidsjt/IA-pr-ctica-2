@@ -1,9 +1,9 @@
 import numpy as np
 
 initial_boards = [ 
-    np.array([[ -1, 0, 1],
-              [ 0, -1, 0],
-              [ 1, 0, 0]])
+    np.array([[ 0, 0, 0],
+              [ 0, 1, 0],
+              [ 0, 0, -1]])
 ]
 
 class Gato:
