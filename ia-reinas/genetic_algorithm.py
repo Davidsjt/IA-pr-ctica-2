@@ -1,78 +1,96 @@
+# genetic_algorithm.py
 import numpy as np
 from selection_methods import roulette_wheel_selection, random_selection, ranking_selection
 from crossover_methods import one_point_crossover, n_point_crossover, uniform_crossover
 from mutation_methods import flipping_mutation, swap_mutation, reverse_mutation
 from n_queens import Board, calculate_fitness
 
-class GeneticAlgorithm:
-    def __init__(self, problem, population_size=8, max_iterations=10, mutation_rate=0.1):
-        self.problem = problem
-        self.population_size = population_size
-        self.max_iterations = max_iterations
-        self.mutation_rate = mutation_rate
+def weak_replacement(population, fitnesses, offspring, offspring_fitnesses):
+    """
+    Realiza un reemplazo débil. Reemplaza a los peores individuos de la población con los hijos generados.
+    """
+    combined_population = np.concatenate((population, offspring), axis=0)
+    combined_fitnesses = np.concatenate((fitnesses, offspring_fitnesses), axis=0)
+    
+    # Ordenamos a la población combinada según fitness, de mayor a menor (mejores primero)
+    sorted_indices = np.argsort(combined_fitnesses)[::-1]
+    
+    # Mantenemos a los mejores individuos de la población combinada
+    new_population = [combined_population[i] for i in sorted_indices[:len(population)]]
+    new_fitnesses = [combined_fitnesses[i] for i in sorted_indices[:len(population)]]
+    
+    return np.array(new_population), np.array(new_fitnesses)
 
-    def weak_replacement(self, population, children, fitnesses):
-        population_fitnesses = [calculate_fitness(board) for board in population]
+def genetic_algorithm(population_size=100, board_size=8, max_generations=1000, crossover_method='one_point', 
+                      mutation_method='flipping', selection_method='roulette', mutation_rate=0.1):
+    """
+    Ejecuta el algoritmo genético para resolver el problema de las n reinas.
+    """
+    # Inicializamos la población aleatoria
+    population = [Board(board_size).queens for _ in range(population_size)]
+    fitnesses = np.array([calculate_fitness(individual) for individual in population])
+
+    # Iteramos a través de las generaciones
+    for generation in range(max_generations):
+        print(f"Generación {generation} - Mejor fitness: {np.max(fitnesses)}")
         
-        combined_population = np.concatenate((population, children))
-        combined_fitnesses = np.concatenate((population_fitnesses, fitnesses))
+        if np.max(fitnesses) == 0:
+            print("Solución encontrada!")
+            break
         
-        sorted_indices = np.argsort(combined_fitnesses)[::-1]  
-        new_population = combined_population[sorted_indices][:self.population_size]  
+        # Selección de padres
+        if selection_method == 'roulette':
+            parents = roulette_wheel_selection(population, fitnesses)
+        elif selection_method == 'random':
+            parents = random_selection(population)
+        elif selection_method == 'ranking':
+            parents = ranking_selection(population, fitnesses)
         
-        return new_population
+        # Cruce para generar hijos
+        if crossover_method == 'one_point':
+            offspring = one_point_crossover(parents[0], parents[1])
+        elif crossover_method == 'n_point':
+            offspring = n_point_crossover(parents[0], parents[1], n_points=2)
+        elif crossover_method == 'uniform':
+            offspring = uniform_crossover(parents[0], parents[1])
 
-    def run(self):
-        population = [Board(size=10).queens for _ in range(self.population_size)]
-        fitnesses = [calculate_fitness(board) for board in population]
-
-        selection_methods = [roulette_wheel_selection, random_selection, ranking_selection]
-        crossover_methods = [one_point_crossover, n_point_crossover, uniform_crossover]
-        mutation_methods = [flipping_mutation, swap_mutation, reverse_mutation]
+        offspring = list(offspring)
         
-        best_fitness_per_combination = {}
+        # Aplicamos mutación a los hijos
+        for i in range(len(offspring)):
+            if np.random.rand() < mutation_rate:
+                if mutation_method == 'flipping':
+                    offspring[i] = flipping_mutation(offspring[i])
+                elif mutation_method == 'swap':
+                    offspring[i] = swap_mutation(offspring[i])
+                elif mutation_method == 'reverse':
+                    offspring[i] = reverse_mutation(offspring[i])
+        
+        # Calculamos el fitness de los hijos
+        offspring_fitnesses = np.array([calculate_fitness(ind) for ind in offspring])
+        
+        # Reemplazo débil
+        population, fitnesses = weak_replacement(population, fitnesses, offspring, offspring_fitnesses)
 
-        for selection in selection_methods:
-            for crossover in crossover_methods:
-                for mutation in mutation_methods:
-                    best_fitness = float('-inf')
+    # Retornamos la mejor solución encontrada
+    best_solution_index = np.argmax(fitnesses)
+    return population[best_solution_index], fitnesses[best_solution_index]
 
-                
-                    for generation in range(self.max_iterations):
-                        # Selección
-                        if selection == random_selection:
-                            selected_population = selection(population, self.population_size)
-                        else:
-                            selected_population = selection(population, fitnesses, self.population_size)
-                        children = []
-                        for i in range(0, self.population_size, 2):
-                            child1, child2 = crossover(np.array(selected_population[i]), np.array(selected_population[i + 1]))
-                            children.extend([child1, child2])
-
-                        mutated_population = [mutation(child) if np.random.rand() < self.mutation_rate else child for child in children]
-
-                        fitnesses = [calculate_fitness(board) for board in mutated_population]
-
-                        population = self.weak_replacement(population, mutated_population, fitnesses)
-                        
-                        current_best_fitness = max(fitnesses)
-                        if current_best_fitness > best_fitness:
-                            best_fitness = current_best_fitness
-
-                    best_fitness_per_combination[(selection.__name__, crossover.__name__, mutation.__name__)] = best_fitness
-
-                    print(f"Selection: {selection.__name__}, Crossover: {crossover.__name__}, Mutation: {mutation.__name__}, Best Fitness: {best_fitness}")
-
-        return best_fitness_per_combination
 if __name__ == "__main__":
-    problem_size = 10
+    best_solution, best_fitness = genetic_algorithm(
+        population_size=8, 
+        board_size=10, 
+        max_generations=1000, 
+        crossover_method='one_point', 
+        mutation_method='flipping', 
+        selection_method='roulette', 
+        mutation_rate=0.1
+    )
+    
+    print(f"Mejor solución: {best_solution}")
+    print(f"Mejor fitness: {best_fitness}")
 
-    ga = GeneticAlgorithm(problem=problem_size)
-    results = ga.run()
 
-    print("Resultados de fitness para cada combinación de operadores genéticos:")
-    for combination, fitness in results.items():
-        print(f"{combination}: {fitness}")
 
 
 
