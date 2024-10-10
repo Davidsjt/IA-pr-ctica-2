@@ -108,6 +108,12 @@ def play_game(board):
     print("Juego terminado")
     print(game)
 
+print("Caso 1")
+
+for board in initial_boards:
+    for row in board:
+        print(' '.join(str(element) for element in row))
+    print()
 play_game(initial_boards[0])
 
 
